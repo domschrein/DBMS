@@ -1,0 +1,80 @@
+---
+title: "Assignment 9: Query XML "
+output: html_notebook
+---
+
+
+```{r}
+#install.packages("XML")
+library(XML)
+```
+
+
+parsing XML file
+```{r}
+path <- "/users/domschrein/desktop/"
+xmlFile <- "Books-v3.xml"
+fp <- paste0(path,xmlFile)
+
+
+xmlObj <- xmlParse(fp)
+```
+
+
+
+QUERY 1:
+What are the titles of all books written by "Galos, Mike"? List the titles and the prices.
+```{r}
+xpathEx <- "/catalog/book[author='Galos, Mike']/title|/catalog/book[author='Galos, Mike']/price"
+
+title_price <- xpathSApply(xmlObj, xpathEx, xmlValue)
+
+title_price
+```
+
+
+
+QUERY 2:
+In what genre is the book with id "bk109".
+```{r}
+
+xpathEx <- '/catalog/book[@id ="bk109"]/genre/text()'
+bk109 <- xpathSApply(xmlObj, xpathEx, xmlValue)
+bk109
+```
+
+
+QUERY 3:
+What are the titles of the books that sell for the lowest price? (Use the min aggregation function)
+..[../price=min(//price)]
+```{r}
+
+xpathEx <- '/catalog/book[price= min(//price)]/title'
+
+min_price <- xpathSApply(xmlObj, xpathEx, xmlValue)
+min_price
+```
+
+
+
+QUERY 4: 
+List the title and prices of all books in the "Computer" genre.
+```{r}
+xpathEx <- '/catalog/book[genre ="Computer"]/title|/catalog/book[genre ="Computer"]/price'
+genre <- xpathSApply(xmlObj, xpathEx, xmlValue)
+genre
+```
+
+
+QUERY 5: 
+What is the number of all books that cost less than $5?
+```{r}
+xpathEx <- 'count(/catalog/book[price>5]/title/text())'
+cheap_books <- xpathSApply(xmlObj, xpathEx, xmlValue)
+cheap_books
+```
+
+
+
+
+
