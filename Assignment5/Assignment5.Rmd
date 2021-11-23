@@ -1,0 +1,92 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(RSQLite)
+
+# connect to the SQLite database in the specified file
+db.conn <- dbConnect(SQLite(), dbname="/Users/domschrein/Desktop/CS5200/MediaDB.db")
+
+```
+
+Part 1:
+SELECT, the "invoice_items" table into a data frame called rs.
+Add a new column to rs for the extended price called ExtPrice = Quantity * Price.
+```{r}
+# construct a SQL query
+invoice_items = "SELECT * FROM invoice_items"
+
+# send the SQL query to the database
+rs = dbGetQuery(db.conn, invoice_items)
+
+
+dbSendQuery(db.conn, "ALTER TABLE invoice_items ADD ExtPrice DOUBLE;")
+```
+
+Using R, what is the average extended price (rounded to 2 decimals) = 1.04
+```{r}
+
+dbSendQuery(db.conn, "UPDATE invoice_items SET ExtPrice = (Quantity * UnitPrice);")
+
+head(rs, 3)
+avgExtPrice <- round(mean(rs$ExtPrice), 2)
+avgExtPrice
+
+```
+
+Using sqldf, write a SQL query against the data frame rs from the question above that finds the total amount for each invoice (i.e., the sum of the extended prices for the invoice_items in each invoice) and the number of items in the invoice. So, the result set contains rows that each have the invoice ID, the total, and the number of items.
+```{r}
+library(sqldf)
+
+#sqldf("select * from rs")
+
+df <- rs
+#sqldf("SELECT InvoiceID, Sum(Quantity) as TotalItems from df group by InvoiceID;")
+df <- sqldf("SELECT InvoiceID, Sum(UnitPrice) as TotalPrice, Sum(Quantity) as TotalItems from df group by InvoiceID;")
+head(df)
+
+
+```
+
+Part 3: 
+create a scatter plot of the total number of items in an invoice- TotalItems (x axis) versus the total- TotalPrice (y axis). Add proper axis labels.
+```{r}
+head(df)
+x <- df$TotalItems
+y <- df$TotalPrice
+xlab = "Total Items"
+ylab = "Total Price"
+main = "Invoice Breakdown"
+plot(x,y, xlab = "Total Items",
+ylab = "Total Price",
+main = "Invoice Breakdown" )
+
+```
+
+Part 4:
+10% discount to the total amount for each invoice for 5 items or more - new column DiscPrice. 
+
+```{r}
+library(sqldf)
+
+sqldf("SELECT * from df WHERE TotalItems >= 5;")
+df$DiscPrice <- round((df$TotalPrice - (df$TotalPrice *.1)),2)
+DiscPrice
+
+
+```
+
+```{r}
+library(sqldf)
+sqldf("SELECT DiscPrice from df;")
+```
+
+
+Disconnect
+```{r}
+dbDisconnect(conn)
+```
+
