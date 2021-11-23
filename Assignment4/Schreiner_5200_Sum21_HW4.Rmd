@@ -1,0 +1,105 @@
+---
+title: "Assignment 4"
+author: Dominique Schreiner
+output: html_notebook
+---
+
+```{r}
+library(RSQLite)
+
+fpath = "/Users/domschrein/Desktop/CS5200/"
+dbfile = "MediaDB.db"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath,dbfile))
+```
+
+QUERY 1: the last names, city, and state of all customers who made at least one purchase
+```{sql connection= dbcon}
+SELECT DISTINCT customers.LastName, customers.City, customers.State
+FROM customers, invoices
+  WHERE customers.CustomerId = invoices.CustomerId;
+```
+QUERY 2: the titles of each albums and the artists who created it
+```{sql connection=dbcon}
+SELECT * FROM artists 
+JOIN albums 
+  ON artists.ArtistID = albums.AlbumId;
+
+```
+QUERY 3: the total number of unique customers for each country, ordered alphabetically by country who made at least one purchase
+```{sql connection=dbcon}
+SELECT DISTINCT invoices.InvoiceId, invoices.BillingCountry
+FROM invoices 
+WHERE invoices.InvoiceId >= 1
+ORDER BY invoices.BillingCountry ASC;
+```
+QUERY 4: customers never made a purchase, i.e., they appear in the customers table but not in the invoices table
+```{sql connection=dbcon}
+SELECT COUNT(invoices.InvoiceId)
+FROM invoices
+LEFT JOIN customers ON customers.CustomerId = invoices.InvoiceId
+WHERE customers.CustomerID IS NULL;
+```
+
+QUERY 5: The names of the albums containing the substring "symphony" in the album title
+```{sql connection=dbcon}
+SELECT DISTINCT albums.Title
+FROM albums
+WHERE albums.Title LIKE "%symphony%";
+```
+
+QUERY 6: The names of all artists who performed MPEG (video or audio) tracks in either the "Brazilian Music" or the "Grunge" playlists -- OR 
+```{sql connection=dbcon}
+SELECT DISTINCT artists.name 
+FROM artists, albums, tracks, playlists, playlist_track, media_types 
+WHERE artists.ArtistId = albums.ArtistId 
+AND tracks.TrackId = playlist_track.TrackId 
+AND albums.AlbumId = tracks.AlbumId 
+AND playlists.PlaylistId = playlist_track.PlaylistId
+AND tracks.MediaTypeId = media_types.MediaTypeId
+AND playlists.Name IN ('Brazilian Music','Grunge')
+AND media_types.Name LIKE "%MPEG%";
+```
+QUERY 7: artists published at least 3 MPEG audio tracks
+```{sql connection=dbcon}
+SELECT COUNT(ArtistId) Count
+FROM (SELECT artists.ArtistId FROM artists, albums, tracks, media_types
+WHERE artists.ArtistId = albums.artistid
+AND albums.albumid = tracks.AlbumId
+and tracks.mediatypeid = media_types.MediaTypeId
+And media_types.name LIKE "%MPEG%"
+GROUP BY artists.ArtistId
+HAVING COUNT(tracks.TrackId) > 3);
+```
+
+QUERY 8: the total amount of music for each genre (in hours)? List the genre and time rounded to two decimals.
+```{sql connection=dbcon}
+SELECT tracks.GenreId, playlists.PlaylistId, playlists.Name, ROUND(CAST( CAST(SUM(tracks.Milliseconds) AS double)/3600000 as double),2) AS LENGTH
+FROM genres, tracks, playlist_track, playlists
+WHERE tracks.TrackId = playlist_track.TrackId
+AND playlists.PlaylistId = playlist_track.PlaylistId
+GROUP BY tracks.GenreId
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
