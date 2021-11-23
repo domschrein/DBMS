@@ -1,0 +1,143 @@
+---
+title: "Assignment 3"
+output: html_notebook
+Dominique Schreiner
+---
+
+NOTES: 
+lookup tables needed: 
+[X]subject
+[X] certificate
+
+Subject is categorical and Topic has ONLY 1 subject 
+Only Certifications can be NULL everything is needs to be NOT NULL
+
+From dev.mysql.com
+
+"CASCADE : Delete or update the row from the parent table and automatically delete or update the matching rows in the child table. ...
+SET NULL : Delete or update the row from the parent table and set the foreign key column or columns in the child table to NULL ."
+```{r}
+library(RSQLite)
+
+
+
+fpath = "/Users/domschrein/Desktop/SQLite/"
+dbfile = "commiteeDB.sqlite"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath,dbfile))
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Author
+
+```
+
+
+```{sql connection=dbcon}
+CREATE TABLE Author(
+  aid INTEGER NOT NULL,
+  name varchar(255) NOT NULL,
+  email varchar(255) NOT NULL,
+  PRIMARY KEY(aid)
+)
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Author;
+
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Certifications
+```
+
+Check to see if the column on pertains the data in the list below
+Create a lookup table for the Certification Attribute in Author 
+```{sql connection=dbcon}
+CREATE TABLE Certifications(
+  cid INTEGER NOT NULL,
+  cert_title VARCHAR(50) NOT NULL,
+  CHECK (cert_title IN('PMP','CBAP','CSM','CSTE', 'CAP'))
+  PRIMARY KEY(cid)
+)
+```
+
+Using a join statement to link the columns that hold certiticate title from Certificate table to the Author's name in Author Table 
+Author can have more than one certificate, and certificates can many authors (many to many)
+```{sql connection=dbcon}
+SELECT Author.name, Certifications.cert_title
+FROM Certifications
+JOIN Author ON Author.name = Certifications.cert_title;
+
+```
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Topic 
+```
+
+Topic has exactly one subject, therefore I will use the UNIQUE constraint to accommodate this condition, I am assuming that the topic id can have the same length as another, however since the topic has exactly one subject, a same title would be unlikely, but not impossible. However, for this assignment I'm assuming it would differ.
+```{sql connection=dbcon}
+CREATE TABLE Topic(
+  tid INTEGER NOT NULL,
+  title varchar(255) NOT NULL,
+  lengthInHrs INTEGER NOT NULL,
+  subject varchar(255) NOT NULL,
+  aid INTEGER NOT NULL,
+  PRIMARY KEY (tid),
+  FOREIGN KEY(aid) REFERENCES Author(aid) ON DELETE SET NULL,
+  FOREIGN KEY(subject) REFERENCES Subject(sub_id) ON DELETE CASCADE,
+  CONSTRAINT subject_constraint UNIQUE(subject, title)
+)
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Subject
+```
+
+creating a subject lookup table with foreign keys as the referential element linking to Topic 
+```{sql connection=dbcon}
+CREATE TABLE Subject(
+  sub_id INTEGER NOT NULL,
+  sub_name varchar(255) NOT NULL, 
+  PRIMARY KEY (sub_id),
+  CONSTRAINT sub_unique UNIQUE(sub_id, sub_name),
+  CHECK (sub_name in ('ML', 'SQL', 'R', 'Java'))  
+)
+
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Course 
+```
+
+1 CourseTopic per Course relation 
+```{sql connection=dbcon}
+CREATE TABLE Course(
+  course_number varchar(255) NOT NULL,
+  title varchar(255) NOT NULL,
+  lenghtInDays INTEGER NOT NULL,
+  CONSTRAINT course_constraint UNIQUE(title),
+  PRIMARY KEY(course_number)
+) 
+  
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS CourseTopic 
+```
+
+linking table to display many to many relationship of Course and Topic
+```{sql connection=dbcon}
+CREATE TABLE CourseTopic(
+  course_code varchar(255) NOT NULL,
+  topic_code INTEGER NOT NULL,
+  FOREIGN KEY(course_code) REFERENCES Course(course_number) ON DELETE CASCADE,
+  FOREIGN KEY(topic_code) REFERENCES Topic(tid) ON DELETE CASCADE
+  
+)
+
+```
+
+```{r}
+dbDisconnect(dbcon)
+```
+
