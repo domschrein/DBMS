@@ -1,0 +1,48 @@
+---
+title: "Assignment 8"
+output: html_notebook
+author: Dominique Schreiner
+---
+
+
+```{r}
+#install.packages("XML")
+library(XML)
+```
+
+
+Read the XML into R (with validation)
+```{r}
+path <- "/users/domschrein/desktop/"
+xmlFile <- "Schreiner_Assignment8_CS5200_Sum21.xml"
+fp <- paste0(path,xmlFile)
+
+xmlObj <- xmlParse(fp)
+xmlObjTree <- xmlTreeParse(fp)
+
+xmlObj
+```
+
+Getting the total trade counts 
+```{r}
+xmlObj <- xmlParse(fp)
+xpathEx <- 'count(//txns/Trade[@tid])'
+trades <- xpathSApply(xmlObj, xpathEx, xmlValue)
+
+as.numeric(trades)
+
+```
+
+XPath to find the total number of trades for some Security (pick on of your example). Print the result to show that your XML was correctly encoded, validates, and can be processed
+
+I choose to print the number of times the Security GOOGLE was traded which has the id tGOOG. Which should have a total count of 4. 
+```{r}
+xmlObj <- xmlParse(fp)
+xpathEx <- 'count(//txns/Trade[@cusip = "tGOOG"])'
+trades <- xpathSApply(xmlObj, xpathEx, xmlValue)
+
+as.numeric(trades)
+```
+
+
+
