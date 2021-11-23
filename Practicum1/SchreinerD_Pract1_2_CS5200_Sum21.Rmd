@@ -1,0 +1,443 @@
+---
+title: "Practicum 1F"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+---
+title: "Practicum 1"
+author: "Dominique Schreiner"
+date: "7/5/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+rm(list=ls())
+
+```
+
+
+The libraries to support my functions created throughout this project. 
+```{r}
+
+library(readr)
+library(dplyr)
+library(RMySQL)
+library(ggplot2)
+library(lubridate)
+
+
+```
+
+Loading the CSV file
+```{r}
+
+BirdStrikesData <- read_csv("BirdStrikesData.csv")
+
+```
+
+Select and rename columns
+```{r}
+
+BirdStrikesNew = BirdStrikesData %>% select(`Airport: Name`, `Wildlife: Number Struck Actual`, FlightDate, `Aircraft: Airline/Operator`, `When: Phase of flight`)
+
+names(BirdStrikesNew) = c("Airport", "StrikeNum", "FlightDate", "Airline", "FlightPhase")
+
+```
+
+Cleanup dataset
+```{r}
+
+BirdStrikesNew = BirdStrikesNew %>% filter(is.na(Airport) == FALSE)
+
+```
+
+Create Year column
+```{r}
+
+lst = strsplit(BirdStrikesNew$FlightDate, "/")
+nlst = length(lst)
+
+unlst = unlist(lst)
+
+Year = vector(length=nlst)
+
+for(i in 1:nlst) {
+  
+  year = unlst[i*3]
+  year = strsplit(year, " ")
+  year = year[[1]][1]
+  year = as.Date(year, "%Y")
+  Year[i] = year
+                    
+}
+
+class(Year) = "Date"
+
+BirdStrikesNew$Year = Year
+
+```
+
+Creating DataSet to use for FlightPhase Table = FlightPhaseDF
+```{r}
+
+FlightPhase = unique(BirdStrikesNew$FlightPhase)
+n = length(FlightPhase)
+PhaseID = c(1:n)
+
+FlightPhaseDF = data.frame(PhaseID = PhaseID, 
+                           PhaseName = FlightPhase)
+
+```
+
+Creating DataSet to use for Airline Table = AirlineDF
+```{r}
+
+airlineName = unique(BirdStrikesNew$Airline)
+n = length(airlineName)
+airlineID = c(1:n)
+
+AirlineDF = data.frame(airlineID = airlineID, 
+                           airlineName = airlineName)
+
+```
+
+Creating DataSet to use for Airport Table = AirportDF
+```{r}
+
+airportName = unique(BirdStrikesNew$Airport)
+n = length(airportName)
+airportID = c(1:n)
+
+AirportDF = data.frame(airportID = airportID, 
+                           airportName = airportName)
+
+```
+
+
+# DB Settings to provide connection to my cloud server. I chose to use AWS. 
+```{r}
+
+db_user <- 'admin'
+db_password <- 'CS5200_Sum21'
+db_name <- 'practicum1'
+db_host <- 'practicum1.ccjlbposbfqr.us-east-2.rds.amazonaws.com'
+db_port <- 3306
+
+# Connect to db
+mydb <-  dbConnect(MySQL(), user = db_user, password = db_password, database = db_name, host = db_host, port = db_port)
+
+```
+
+
+Selecting the Schema to Use
+```{sql connection=mydb}
+
+USE practicum1;
+
+```
+
+Below are the queries to create tables in my schema. I used the following queires, drop table if exits, followed by create, and then writing the table. 
+```{sql connection=mydb}
+DROP TABLE IF EXISTS
+BirdStrikeIncident;
+```
+
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS
+Airline;
+```
+
+```{sql connection=mydb}
+CREATE TABLE Airline (
+airlineID INT NOT NULL,
+airlineName VARCHAR(50),
+PRIMARY KEY (airlineID)
+);
+```
+
+```{r}
+
+RMySQL::dbWriteTable(mydb, "airline", AirlineDF, 
+                     append=F, overwrite = T, row.names=FALSE)
+
+```
+
+```{sql connection=mydb}
+SELECT * FROM Airline
+LIMIT 5
+```
+
+```{sql connection=mydb}
+
+SELECT count(*) FROM Airline
+ 
+```
+
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS
+Airport;
+```
+
+```{sql connection=mydb}
+CREATE TABLE Airport (
+airportID  INT NOT NULL,
+airportName VARCHAR(255),
+PRIMARY KEY (airportID)
+);
+```
+
+```{r}
+RMySQL::dbWriteTable(mydb, "airport", AirportDF, 
+                     append=F, overwrite = T, row.names=FALSE)
+```
+
+```{sql connection=mydb}
+SELECT * FROM Airport
+LIMIT 5
+```
+
+```{sql connection=mydb}
+
+SELECT count(*) FROM Airport
+ 
+```
+
+
+
+```{sql connection=mydb}
+
+DROP TABLE IF EXISTS FlightPhase;
+
+```
+
+```{sql connection=mydb}
+
+CREATE TABLE FlightPhase
+(PhaseID INT NOT NULL,
+ PhaseName VARCHAR(20),
+ PRIMARY KEY (PhaseID)
+)
+
+```
+
+
+```{r}
+
+RMySQL::dbWriteTable(mydb, "flightphase", FlightPhaseDF,
+                     append=F, overwrite = T, row.names=FALSE)
+
+```
+
+```{sql connection=mydb}
+
+select * from flightphase
+LIMIT 7
+
+```
+
+```{sql connection=mydb}
+
+SELECT count(*) FROM flightphase
+ 
+```
+
+Creating DataFrame for birdStrikeIncident Table =  birdStrikesDF
+```{r}
+
+birdStrikesDF = BirdStrikesNew %>% select(Year, StrikeNum)
+n = nrow(birdStrikesDF)
+
+airportID = vector(length = n)
+airlineID = vector(length = n)
+phaseID = vector(length = n)
+
+for (i in 1:n) {
+  
+  obs = BirdStrikesNew[i,]
+  
+  Airport = obs$Airport
+  Airport_ind = which(AirportDF$airportName == Airport)
+  airportID[i] = AirportDF$airportID[Airport_ind]
+  
+  # print(airportID[i])
+  
+  Airline = obs$Airline
+  Airline_ind = which(AirlineDF$airlineName == Airline)
+  airlineID[i] = AirlineDF$airlineID[Airline_ind]
+  
+  # print(airlineID[i])
+  
+  FlightPhase = obs$FlightPhase
+  Phase_ind = which(FlightPhaseDF$PhaseName == FlightPhase)
+  phaseID[i] = FlightPhaseDF$PhaseID[Phase_ind]
+  
+  # print(phaseID[i])
+  
+}
+  
+birdStrikesDF$airportID = airportID
+birdStrikesDF$airlineID = airlineID
+birdStrikesDF$phaseID = phaseID
+
+head(birdStrikesDF)
+
+```
+
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS
+birdstrikeincident;
+```
+
+```{sql connection=mydb}
+CREATE TABLE birdstrikeincident (
+Year DATE NOT NULL, 
+StrikeNum INT NOT NULL,
+airportID  INT NOT NULL,
+airlineID INT NOT NULL,
+phaseID INT NOT NULL,
+PRIMARY KEY (airportID, airlineID),
+FOREIGN KEY (airportID) REFERENCES Airport (airportID),
+FOREIGN KEY (airlineID) REFERENCES Airline (airlineID),
+FOREIGN KEY (phaseID) REFERENCES FlightPhase (phaseID)
+);
+
+```
+
+```{r}
+RMySQL::dbWriteTable(mydb, "birdstrikeincident", birdStrikesDF, 
+                     append=F, overwrite = T, row.names=FALSE)
+```
+
+
+```{sql connection=mydb}
+SELECT * FROM birdstrikeincident
+LIMIT 5;
+```
+
+```{sql connection=mydb}
+SELECT COUNT(*) FROM birdstrikeincident
+```
+Task 4: find the number of bird strike incidents for each airline upon take-off or climb
+```{sql connection=mydb}
+SELECT phaseID, airlineID, COUNT(StrikeNum)
+FROM birdstrikeincident
+WHERE phaseID = '1'
+OR phaseID ='4'
+GROUP BY airlineID;
+```
+Task 5: to find the airports that had the most bird strike incidents
+```{sql connection=mydb}
+SELECT airlineID, airportID, SUM(StrikeNum), phaseID
+FROM birdstrikeincident
+GROUP BY airportID
+ORDER BY SUM(StrikeNum) DESC;
+```
+Task 6: to find the number of bird strike incidents by year
+```{sql connection=mydb}
+SELECT year(Year), SUM(StrikeNum), airlineID
+FROM birdstrikeincident
+GROUP BY Year
+ORDER BY SUM(StrikeNum) DESC;
+```
+Task 7
+Creating DataFrame to Plot 
+```{r}
+BarChartDF = BirdStrikesNew %>% 
+  filter(year(Year) %in% c(2008:2011) & 
+           FlightPhase != 'Parked' & FlightPhase != 'Taxi')
+
+BarChartDF = BarChartDF %>% 
+  mutate(
+    Year = year(Year),
+    GRP=ifelse(FlightPhase=='Take-off run' | FlightPhase=='Climb', 'TC', 'ADL'),
+  ) %>% select(Year, GRP, StrikeNum)
+
+```
+
+Cleaning Up The Year Format for Year Column 
+The GRP is the groups of flight phase: whether it is on the ascent or descent off the trip. 
+I classified Approach, Descent, Landing to be during the descent phase of a flight and is represented by ADL.
+I classified Climb and Take-Off Run to be during the ascent phase of a flight and is reprsented by TC. 
+```{r}
+
+BarChartDF = BarChartDF %>% group_by(Year, GRP) %>%
+  summarise(StrikeNum = sum(StrikeNum), .groups='keep')
+BarChartDF = as.data.frame(BarChartDF)
+BarChartDF
+
+```
+
+Displaying As Stacked 
+```{r}
+
+# Stacked
+ggplot(BarChartDF, aes(fill=GRP, y=StrikeNum, x=Year)) + 
+    geom_bar(position="stack", stat="identity")
+
+```
+
+Displayed as dual columns stacked side by side.
+```{r}
+
+
+# SideBySide
+ggplot(BarChartDF, aes(fill=GRP, y=StrikeNum, x=Year)) + 
+    geom_bar(position="dodge", stat="identity")
+
+```
+
+Task 8: removes a bird strike incident from the database
+I created this in MySQL workbench and it does work here, however the following code chunk to execute the stored procedure in R was prohibiting the generation of the knitted HTML. So I commented it out. Below is the call function displaying it deletes bird strike incident. 
+```{sql connection=mydb}
+
+CALL sp_DeleteIncident ('ALASKA AIRLINES');
+
+```
+
+```{r}
+
+# query <- 
+# "
+# DROP PROCEDURE IF EXISTS sp_DeleteIncident;
+# 
+# CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_DeleteIncident`(IN airlineNameIn varchar(50))
+# 
+# BEGIN
+# DECLARE airlineIDOut INT;
+# 
+# select airlineID INTO airlineIDOut from airline
+# where airlineName = airlineNameIn;
+# 
+# delete from BirdStrikeIncident
+# where airlineID = airlineIDOut;
+# 
+# END
+# "
+# 
+# 
+# dbGetQuery(mydb, "select * from airline")
+# 
+# res = sendQuery <- dbSendQuery(mydb, "select * from airline")
+# data <- dbFetch(res, n = 2)
+# data
+# 
+# ## sendQuery <- dbSendQuery(mydb, query)
+# dbClearResult(dbListResults(mydb)[[1]])
+
+```
+
+
+
+ 
