@@ -1,5 +1,4 @@
-## Practicum II
+## Practicum I
 
-### Part 1 - create a normalized relational OLTP database and populate it with data from an XML document. 
-### Part 2 - add to the normalized schema fact tables and turn the normalized schema into a denormalized schema suitable for OLAP. 
-### Part 3 - use the OLAP star/snowflake schema to do some (simple) data mining.
+### In this practicum I built a database that can be used to analyze bird strikes on aircraft. Including a logical data model, a relational schema, realize the relational schema in MySQL/MariaDB, load data into the database, execute SQL queries, a finally perform some simple analysis of the data.
+
